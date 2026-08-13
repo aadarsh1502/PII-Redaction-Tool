@@ -4,7 +4,7 @@ import spacy
 from docx import Document
 from faker import Faker
 
-from detectors import detect_all_pii
+from detectors import detect_all_pii, CompanyNameRegistry
 
 
 INPUT_FILE = "input/Red Herring Prospectus.docx"
@@ -83,6 +83,13 @@ class FakerRedactor:
         """
         Return the fake replacement for (pii_type, original_value).
         Generates and caches a new value if not seen before.
+
+        NOTE: for COMPANY detections that came from the shortened-
+        mention registry (see CompanyNameRegistry), the caller should
+        pass the CANONICAL full company name as original_value so that
+        "ICICI Securities" and "ICICI Securities Limited" both resolve
+        to the exact same fake company name. This is handled in
+        redact_text() below via the "canonical" field on the detection.
         """
         key = (pii_type, original_value)
         if key not in self._mapping:
@@ -94,7 +101,7 @@ class FakerRedactor:
 # REDACT TEXT
 # ============================================================
 
-def redact_text(text: str, nlp, redactor: FakerRedactor):
+def redact_text(text: str, nlp, redactor: FakerRedactor, company_registry: CompanyNameRegistry):
     """
     Detect all PII in *text*, replace each span with a fake value sourced
     from *redactor*, and return the redacted string plus the list of
@@ -104,7 +111,7 @@ def redact_text(text: str, nlp, redactor: FakerRedactor):
     if not text.strip():
         return text, []
 
-    results = detect_all_pii(text, nlp=nlp)
+    results = detect_all_pii(text, nlp=nlp, company_registry=company_registry)
 
     if not results:
         return text, []
@@ -114,7 +121,13 @@ def redact_text(text: str, nlp, redactor: FakerRedactor):
 
     for result in sorted(results, key=lambda item: item["start"], reverse=True):
 
-        fake_value = redactor.get_fake(result["type"], result["value"])
+        # For shortened company mentions (e.g. "ICICI Securities" found
+        # via the registry), map using the CANONICAL full name so the
+        # fake value stays consistent with the full-suffix mention
+        # elsewhere in the document.
+        mapping_key_value = result.get("canonical", result["value"])
+
+        fake_value = redactor.get_fake(result["type"], mapping_key_value)
 
         start = result["start"]
         end = result["end"]
@@ -129,6 +142,39 @@ def redact_text(text: str, nlp, redactor: FakerRedactor):
 
 
 # ============================================================
+# BUILD COMPANY REGISTRY (whole-document warm-up pass)
+# ============================================================
+
+def build_company_registry(doc, nlp) -> CompanyNameRegistry:
+    """
+    Scan the ENTIRE document once (paragraphs + tables) purely to collect
+    every company name that validates with its full legal suffix (e.g.
+    "ICICI Securities Limited"). This lets the main redaction pass catch
+    shortened/informal repeat mentions ("ICICI Securities") consistently,
+    even if the shortened form appears BEFORE the full-suffix mention.
+    """
+    text_parts = []
+
+    for paragraph in doc.paragraphs:
+        if paragraph.text.strip():
+            text_parts.append(paragraph.text)
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    if paragraph.text.strip():
+                        text_parts.append(paragraph.text)
+
+    full_document_text = "\n".join(text_parts)
+
+    registry = CompanyNameRegistry()
+    registry.warm_up(full_document_text, nlp)
+
+    return registry
+
+
+# ============================================================
 # PROCESS DOCUMENT
 # ============================================================
 
@@ -138,8 +184,12 @@ def process_document():
     print("PII REDACTION")
     print("=" * 70)
 
-    # Load spaCy model
-    nlp = spacy.load("en_core_web_sm", exclude=["parser", "tagger", "lemmatizer", "attribute_ruler"])
+    # Load spaCy model (NER only — parser/tagger/etc excluded to avoid
+    # memory issues on repeated per-paragraph calls)
+    nlp = spacy.load(
+        "en_core_web_sm",
+        exclude=["parser", "tagger", "lemmatizer", "attribute_ruler"],
+    )
 
     # Load document
     doc = Document(INPUT_FILE)
@@ -147,6 +197,13 @@ def process_document():
     # One redactor instance per document run — shared mapping across all
     # paragraphs, tables, headers, and footers.
     redactor = FakerRedactor()
+
+    # Warm-up pass: scan the whole document once to build the company
+    # name registry BEFORE doing any redaction, so shortened company
+    # mentions are caught consistently regardless of document order.
+    print("Building company-name registry (whole-document warm-up pass)...")
+    company_registry = build_company_registry(doc, nlp)
+    print(f"Registry built: {len(company_registry._canonical)} canonical company name(s) found.\n")
 
     total_detections = 0
     counts = {}
@@ -162,7 +219,9 @@ def process_document():
             return
 
         original_text = paragraph.text
-        redacted_text, results = redact_text(original_text, nlp, redactor)
+        redacted_text, results = redact_text(
+            original_text, nlp, redactor, company_registry
+        )
 
         if results:
             paragraph.text = redacted_text

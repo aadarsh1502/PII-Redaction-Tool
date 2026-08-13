@@ -1,0 +1,164 @@
+[
+  {
+    "id": "P1",
+    "source": "paragraph",
+    "text_snippet": "Contact Person: Sarthak Malvadkar, Company Secretary and Compliance Officer; Telephone: + 91 20 4505 3237;",
+    "expected": [
+      {"type": "PERSON", "value": "Sarthak Malvadkar"},
+      {"type": "PHONE",  "value": "91 20 4505 3237"}
+    ]
+  },
+  {
+    "id": "P2",
+    "source": "paragraph",
+    "text_snippet": "E-mail: cs.connect@kshinternational.com; Website: www.kshinternational.com",
+    "expected": [
+      {"type": "EMAIL", "value": "cs.connect@kshinternational.com"}
+    ]
+  },
+  {
+    "id": "P3",
+    "source": "paragraph",
+    "text_snippet": "Kushal Subbayya Hegde, Rajesh Kushal Hegde, Rohit Kushal Hegde and Rakhi Girija Shetty are also our Executive Directors.",
+    "expected": [
+      {"type": "PERSON", "value": "Kushal Subbayya Hegde"},
+      {"type": "PERSON", "value": "Rajesh Kushal Hegde"},
+      {"type": "PERSON", "value": "Rohit Kushal Hegde"}
+    ]
+  },
+  {
+    "id": "P4",
+    "source": "paragraph",
+    "text_snippet": "Certain of our SMs including, Sandesh Bhagwat, CEO, Amod Joshi, CFO, Sarthak Malvadkar, CS and Compliance Officer, and Ganesh Prasad, Technical Director, are also our KMPs.",
+    "expected": [
+      {"type": "PERSON", "value": "Sandesh Bhagwat"},
+      {"type": "PERSON", "value": "Amod Joshi"},
+      {"type": "PERSON", "value": "Sarthak Malvadkar"}
+    ]
+  },
+  {
+    "id": "T1",
+    "source": "table",
+    "text_snippet": "Email: ksh.ipo@nuvama.com\nTelephone: +91 22 4009 4400",
+    "expected": [
+      {"type": "EMAIL", "value": "ksh.ipo@nuvama.com"},
+      {"type": "PHONE", "value": "+91 22 4009 4400"}
+    ]
+  },
+  {
+    "id": "T2",
+    "source": "table",
+    "text_snippet": "Email: ksh@icicisecurities.com\nTelephone: +91 22 6807 7100",
+    "expected": [
+      {"type": "EMAIL", "value": "ksh@icicisecurities.com"},
+      {"type": "PHONE", "value": "+91 22 6807 7100"}
+    ]
+  },
+  {
+    "id": "T3",
+    "source": "table",
+    "text_snippet": "Telephone: +91 81081 14949\nE-mail: kshinternational.ipo@in.mpms.mufg.com",
+    "expected": [
+      {"type": "PHONE", "value": "+91 81081 14949"},
+      {"type": "EMAIL", "value": "kshinternational.ipo@in.mpms.mufg.com"}
+    ]
+  },
+  {
+    "id": "T4",
+    "source": "table",
+    "text_snippet": "Nuvama Wealth Management Limited\n801 - 804, Wing A, Building No 3, Inspire BKC, G Block, Bandra Kurla Complex, Bandra East, Mumbai 400051, Maharashtra, India\nTel: +91 22 40094400\nE-mail: ksh.ipo@nuvama.com",
+    "expected": [
+      {"type": "COMPANY", "value": "Nuvama Wealth Management Limited"},
+      {"type": "ADDRESS", "value": "Building No 3, Inspire BKC, G Block, Bandra Kurla Complex, Bandra East, Mumbai 400051, Maharashtra"},
+      {"type": "PHONE",   "value": "+91 22 40094400"},
+      {"type": "EMAIL",   "value": "ksh.ipo@nuvama.com"}
+    ]
+  },
+  {
+    "id": "T5",
+    "source": "table",
+    "text_snippet": "Pushpakamal Apartment, Flat - 1, S. no. 245/ 104, Prabhat Road Lane no. 3, Shivaji Nagar, Deccan Gymkhana, Pune - 411 004, Maharashtra, India",
+    "expected": [
+      {"type": "ADDRESS", "value": "Flat - 1, S. no. 245/ 104, Prabhat Road Lane no. 3, Shivaji Nagar, Deccan Gymkhana, Pune - 411 004, Maharashtra, India"}
+    ]
+  },
+  {
+    "id": "T6",
+    "source": "table",
+    "text_snippet": "Pratik Bunglow, Senapati Bapat Road, behind Sahara Hotel, Shivajinagar, Model Colony, Pune - 411 016, Maharashtra, India",
+    "expected": [
+      {"type": "ADDRESS", "value": "Senapati Bapat Road, behind Sahara Hotel, Shivajinagar, Model Colony, Pune - 411 016, Maharashtra, India"}
+    ]
+  },
+  {
+    "id": "T7",
+    "source": "table",
+    "text_snippet": "A-259, JK Road, Minal Residency, Huzur, Govindpura, Bhopal - 462 023, Madhya Pradesh, India",
+    "expected": [
+      {"type": "ADDRESS", "value": "JK Road, Minal Residency, Huzur, Govindpura, Bhopal - 462 023, Madhya Pradesh, India"}
+    ]
+  },
+  {
+    "id": "T8",
+    "source": "table",
+    "text_snippet": "Hingne Tare & Associates Flat No. 102, Sai Complex Shaniwar Peth, Pune - 411 030 Maharashtra, India\nE-mail: hingnetare@gmail.com",
+    "expected": [
+      {"type": "ADDRESS", "value": "Flat No. 102, Sai Complex Shaniwar Peth, Pune - 411 030 Maharashtra, India"},
+      {"type": "EMAIL",   "value": "hingnetare@gmail.com"}
+    ]
+  },
+  {
+    "id": "P5",
+    "source": "paragraph",
+    "text_snippet": "born on 15 March 1970",
+    "expected": [
+      {"type": "DOB", "value": "15 March 1970"}
+    ]
+  },
+  {
+    "id": "P6",
+    "source": "paragraph",
+    "text_snippet": "Date of Birth: 12/05/1968",
+    "expected": [
+      {"type": "DOB", "value": "12/05/1968"}
+    ]
+  },
+  {
+    "id": "P7",
+    "source": "paragraph",
+    "text_snippet": "Server logs show source IP 192.168.1.100 connecting at midnight.",
+    "expected": [
+      {"type": "IP_ADDRESS", "value": "192.168.1.100"}
+    ]
+  },
+  {
+    "id": "SYN1",
+    "source": "synthetic",
+    "synthetic": true,
+    "note": "SSN does not appear naturally in the Red Herring Prospectus; this record is synthetic.",
+    "text_snippet": "Employee SSN: 523-45-6789 on file.",
+    "expected": [
+      {"type": "SSN", "value": "523-45-6789"}
+    ]
+  },
+  {
+    "id": "SYN2",
+    "source": "synthetic",
+    "synthetic": true,
+    "note": "Credit card numbers do not appear naturally in the Red Herring Prospectus; this record is synthetic.",
+    "text_snippet": "Payment made with card 4539 1488 0343 6467.",
+    "expected": [
+      {"type": "CREDIT_CARD", "value": "4539 1488 0343 6467"}
+    ]
+  },
+  {
+    "id": "SYN3",
+    "source": "synthetic",
+    "synthetic": true,
+    "note": "Credit card numbers do not appear naturally in the Red Herring Prospectus; this record is synthetic.",
+    "text_snippet": "Refund issued to Visa card number 4111111111111111.",
+    "expected": [
+      {"type": "CREDIT_CARD", "value": "4111111111111111"}
+    ]
+  }
+]

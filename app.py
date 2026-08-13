@@ -41,6 +41,7 @@ def load_nlp():
 # ============================================================
 
 def generate_fake_value(pii_type):
+
     if pii_type == "PERSON":
         return fake.name()
 
@@ -76,6 +77,7 @@ def generate_fake_value(pii_type):
 # ============================================================
 
 def redact_text(text, nlp, pii_mapping):
+
     if not text.strip():
         return text, []
 
@@ -96,6 +98,7 @@ def redact_text(text, nlp, pii_mapping):
         key=lambda item: item["start"],
         reverse=True
     ):
+
         pii_type = result["type"]
         original_value = result["value"]
 
@@ -108,8 +111,9 @@ def redact_text(text, nlp, pii_mapping):
         )
 
         if mapping_key not in pii_mapping:
-            pii_mapping[mapping_key] = generate_fake_value(
-                pii_type
+
+            pii_mapping[mapping_key] = (
+                generate_fake_value(pii_type)
             )
 
         replacement = pii_mapping[mapping_key]
@@ -131,6 +135,7 @@ def redact_text(text, nlp, pii_mapping):
 # ============================================================
 
 def process_docx(file_bytes, nlp):
+
     doc = Document(BytesIO(file_bytes))
 
     counts = {}
@@ -145,6 +150,7 @@ def process_docx(file_bytes, nlp):
     # ========================================================
 
     for paragraph in doc.paragraphs:
+
         if not paragraph.text.strip():
             continue
 
@@ -155,9 +161,11 @@ def process_docx(file_bytes, nlp):
         )
 
         if results:
+
             paragraph.text = redacted_text
 
             for result in results:
+
                 pii_type = result["type"]
 
                 counts[pii_type] = (
@@ -171,9 +179,13 @@ def process_docx(file_bytes, nlp):
     # ========================================================
 
     for table in doc.tables:
+
         for row in table.rows:
+
             for cell in row.cells:
+
                 for paragraph in cell.paragraphs:
+
                     if not paragraph.text.strip():
                         continue
 
@@ -184,9 +196,11 @@ def process_docx(file_bytes, nlp):
                     )
 
                     if results:
+
                         paragraph.text = redacted_text
 
                         for result in results:
+
                             pii_type = result["type"]
 
                             counts[pii_type] = (
@@ -247,6 +261,7 @@ uploaded_file = st.file_uploader(
 
 
 if uploaded_file is not None:
+
     st.success(
         f"Uploaded: {uploaded_file.name}"
     )
@@ -256,10 +271,13 @@ if uploaded_file is not None:
         type="primary",
         use_container_width=True
     ):
+
         with st.spinner(
             "Detecting and anonymizing PII..."
         ):
+
             try:
+
                 nlp = load_nlp()
 
                 (
@@ -285,7 +303,9 @@ if uploaded_file is not None:
                 )
 
                 if counts:
+
                     for pii_type in sorted(counts):
+
                         st.write(
                             f"**{pii_type}:** "
                             f"{counts[pii_type]}"
@@ -299,6 +319,7 @@ if uploaded_file is not None:
                     )
 
                 else:
+
                     st.info(
                         "No PII was detected."
                     )
@@ -308,6 +329,7 @@ if uploaded_file is not None:
                 # =================================================
 
                 if pii_mapping:
+
                     st.subheader(
                         "Anonymization Preview"
                     )
@@ -318,6 +340,7 @@ if uploaded_file is not None:
                         (pii_type, original),
                         replacement
                     ) in pii_mapping.items():
+
                         preview.append(
                             {
                                 "Type": pii_type,
@@ -330,6 +353,45 @@ if uploaded_file is not None:
                         preview,
                         use_container_width=True,
                         hide_index=True
+                    )
+
+                # =================================================
+                # EVALUATION CRITERIA
+                # =================================================
+
+                st.subheader(
+                    "📊 Evaluation Criteria"
+                )
+
+                evaluation_file = os.path.join(
+                    ROOT_DIR,
+                    "evaluation",
+                    "evaluation_report.md"
+                )
+
+                if os.path.exists(evaluation_file):
+
+                    with st.expander(
+                        "View Evaluation Criteria",
+                        expanded=False
+                    ):
+
+                        with open(
+                            evaluation_file,
+                            "r",
+                            encoding="utf-8"
+                        ) as f:
+
+                            evaluation_content = f.read()
+
+                        st.markdown(
+                            evaluation_content
+                        )
+
+                else:
+
+                    st.info(
+                        "Evaluation criteria are not available."
                     )
 
                 # =================================================
@@ -356,6 +418,7 @@ if uploaded_file is not None:
                 )
 
             except Exception as e:
+
                 st.error(
                     "An error occurred while processing "
                     "the document."

@@ -1,39 +1,61 @@
-# PII-Redaction-Tool
+# PII Redactor
 
-PII Redactor
+A Python-based tool that detects Personally Identifiable Information (PII) in
+Microsoft Word (`.docx`) documents and replaces it with realistic synthetic
+values generated using Faker.
 
-A Python-based tool that detects Personally Identifiable Information (PII) in Microsoft Word (.docx) documents and replaces detected values with realistic synthetic alternatives generated using Faker.
+## Approach
 
-Approach
+The tool combines rule-based detection with spaCy NER.
 
-The detector uses a combination of rule-based regex detection and spaCy NER:
+- Regex and validation rules detect structured PII such as emails, phone
+  numbers, IP addresses, SSNs, credit cards, dates of birth, and addresses.
+- spaCy (`en_core_web_sm`) is used to detect person and company names.
+- Faker generates realistic replacement values instead of generic redaction
+  labels.
+- Repeated occurrences of the same PII value receive the same replacement
+  throughout the document.
 
-Regex/rule-based detection is used for structured PII such as emails, phone numbers, IP addresses, SSNs, credit-card numbers, dates of birth, and physical addresses.
-spaCy NER (en_core_web_sm) is used to detect person names and company/organization names.
-Faker generates realistic replacement values instead of generic [REDACTED] placeholders.
-Repeated occurrences of the same PII value are replaced with the same generated value throughout the document to maintain consistency.
-Tradeoffs and Limitations
+## Supported PII
 
-Regex-based detection provides good precision for structured PII but can miss unusual formats. spaCy NER improves detection of names and companies but can produce false positives or miss entities, especially in financial documents and unfamiliar Indian names.
+Person names, company names, email addresses, phone numbers, physical
+addresses, dates of birth, SSNs, credit-card numbers, and IP addresses.
 
-Address detection is the most challenging category because addresses can have many different formats. The tool intentionally does not redact financial reference numbers, order/ticket numbers, or transaction identifiers unless they represent one of the supported PII categories.
+## Tradeoffs and Limitations
 
-When PII is detected inside a paragraph, the paragraph text is replaced with the anonymized text, so some run-level Word formatting such as bold, italics, or hyperlinks may not be preserved for that paragraph.
+Regex-based detection works well for structured PII but may miss unusual
+formats. spaCy NER improves name and company detection but can produce false
+positives or miss entities, particularly in financial documents and with
+unfamiliar names.
 
-Supported PII Types
-Person names
-Company names
-Email addresses
-Phone numbers
-Physical addresses
-Dates of birth
-Social Security Numbers (SSNs)
-Credit-card numbers
-IP addresses
-Running the Tool
+Address detection is the most challenging category because addresses can
+appear in many different formats. The tool intentionally does not redact
+financial reference numbers, order/ticket numbers, or transaction identifiers
+unless they match one of the supported PII categories.
 
-Install the dependencies:
+Some run-level Word formatting may not be preserved in paragraphs containing
+detected PII because redaction is applied at the paragraph-text level.
 
+## Evaluation
+
+The detector was evaluated against a hand-labeled ground-truth dataset using
+precision, recall, F1 score, and span-level accuracy.
+
+| Metric | Result |
+|---|---:|
+| Precision | 96.55% |
+| Recall | 93.33% |
+| F1 Score | 94.92% |
+| Accuracy | 90.32% |
+
+The complete evaluation methodology and results are available in
+`evaluation/evaluation_report.md`.
+
+## Run Locally
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 
 Install the spaCy model:
@@ -44,10 +66,18 @@ Run the redaction script:
 
 python src/scan_document.py
 
-The project also includes a Streamlit interface for uploading a .docx file, detecting PII, anonymizing it, and downloading the processed document.
+Or launch the Streamlit interface:
 
-Evaluation
+python -m streamlit run app.py
+Project Structure
+PII_Redactor/
+├── evaluation/
+├── src/
+├── app.py
+├── requirements.txt
+├── README.md
+└── .gitignore
+Live Demo
 
-The detector was evaluated against a hand-labeled ground-truth dataset using precision, recall, F1 score, and span-level accuracy. The complete evaluation methodology, results, error analysis, and per-record breakdown are available in:
-
-evaluation/evaluation_report.md
+Streamlit Cloud:
+https://pii-redaction-tool-csruphyar5v39qfchsvc4r.streamlit.app/

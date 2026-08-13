@@ -355,45 +355,7 @@ if uploaded_file is not None:
                         hide_index=True
                     )
 
-                # =================================================
-                # EVALUATION CRITERIA
-                # =================================================
-
-                st.subheader(
-                    "📊 Evaluation Criteria"
-                )
-
-                evaluation_file = os.path.join(
-                    ROOT_DIR,
-                    "evaluation",
-                    "evaluation_report.md"
-                )
-
-                if os.path.exists(evaluation_file):
-
-                    with st.expander(
-                        "View Evaluation Criteria",
-                        expanded=False
-                    ):
-
-                        with open(
-                            evaluation_file,
-                            "r",
-                            encoding="utf-8"
-                        ) as f:
-
-                            evaluation_content = f.read()
-
-                        st.markdown(
-                            evaluation_content
-                        )
-
-                else:
-
-                    st.info(
-                        "Evaluation criteria are not available."
-                    )
-
+                
                 # =================================================
                 # DOWNLOAD
                 # =================================================

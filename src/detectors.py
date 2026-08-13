@@ -331,7 +331,7 @@ def detect_addresses(text):
                 continue
 
             has_number = bool(re.search(r"\b\d+[A-Za-z]?(?:-\d+)?\b", normalized))
-            
+
             location_words = {"pune", "mumbai", "bhopal", "maharashtra", "india", "shivaji", "nagar", "erandawane", "deccan", "gymkhana", "taloja", "chakan", "khed", "panvel", "raigad", "peth", "residency"}
             has_location = any(word in normalized.split() for word in location_words)
 
@@ -347,8 +347,6 @@ def detect_addresses(text):
             })
 
     return results
-
-import re
 
 
 # ============================================================
@@ -717,6 +715,67 @@ def is_valid_person(entity_text):
 
 
 # ============================================================
+# PERSON SPAN RECOVERY  (BUG FIX)
+# ------------------------------------------------------------
+# spaCy's NER sometimes greedily extends a PERSON span to include a
+# trailing role/title word when there's no comma separating the name
+# from the title (e.g. table cells like "Sarthak Malvadkar Company
+# Secretary and Compliance Officer"). When that happens, the extra
+# word (e.g. "Company") trips is_valid_person's DOCUMENT_WORDS /
+# company_terms filters and the ENTIRE entity — including the real
+# name — gets thrown away.
+#
+# Fix: if the full entity fails validation, try trimming up to 2
+# trailing words and re-validate the shorter candidate. If a trimmed
+# version passes, use it (with correctly adjusted character offsets)
+# instead of discarding the entity outright.
+# ============================================================
+
+def _try_trim_person(entity_text, start_char, max_trim=2):
+    """
+    Attempt to recover a valid person name by trimming trailing words
+    from an over-greedy NER span. Returns (value, start, end) if a
+    trimmed candidate validates, else None.
+    """
+    words = entity_text.split()
+
+    for trim in range(1, max_trim + 1):
+        remaining = len(words) - trim
+
+        if remaining < 2:
+            break
+
+        candidate = " ".join(words[:remaining])
+
+        if is_valid_person(candidate):
+            end_char = start_char + len(candidate)
+            return candidate, start_char, end_char
+
+    return None
+
+
+# ============================================================
+# TRAILING JUNK CHARACTER RECOVERY  (BUG FIX)
+# ------------------------------------------------------------
+# Names followed directly by footnote/decoration characters with no
+# space (e.g. "Kushal Subbayya Hegde*^&", common in table footnote
+# markers) sometimes get mislabeled ORG instead of PERSON by spaCy's
+# small model. Since is_valid_company() then correctly rejects them
+# (no legal-suffix keyword), the name is dropped entirely.
+#
+# Fix: for ORG entities that fail is_valid_company, strip trailing
+# non-alphanumeric junk and see if what's left looks like a valid
+# person name. If so, reclassify it as PERSON.
+# ============================================================
+
+_TRAILING_JUNK_PATTERN = re.compile(r"[\*\^&#@~`|\\/+=<>\[\]{}!]+$")
+
+
+def _strip_trailing_junk(text):
+    return _TRAILING_JUNK_PATTERN.sub("", text).strip()
+
+
+# ============================================================
 # COMPANY VALIDATION
 # ============================================================
 
@@ -928,10 +987,122 @@ def is_valid_company(entity_text):
 
 
 # ============================================================
+# COMPANY NAME REGISTRY  (BUG FIX — company-consistency pass)
+# ------------------------------------------------------------
+# is_valid_company() intentionally requires a legal-suffix keyword
+# (Limited, Ltd, LLP, ...) before accepting a company name — this
+# keeps precision high and avoids false positives on generic terms
+# like "the Company" or "Registered Office".
+#
+# But real documents always shorten a company's name after its first
+# full mention ("ICICI Securities Limited" -> later just "ICICI
+# Securities"), and those shortened repeat mentions have no suffix
+# to validate against, so they were being silently dropped.
+#
+# CompanyNameRegistry fixes this WITHOUT loosening is_valid_company's
+# core rule: it remembers every company name that DID validate with
+# its full legal suffix, derives the shortened form, and then looks
+# for that exact shortened form elsewhere in the document. Only
+# names already confirmed once (in their full, suffixed form) get
+# this treatment — brand-new/unconfirmed short phrases are still
+# never accepted, so precision is preserved.
+# ============================================================
+
+_LEGAL_SUFFIX_TRIM_PATTERN = re.compile(
+    r"\s+(?:Private\s+Limited|Pvt\.?\s*Ltd\.?|Limited|Ltd\.?|LLP|"
+    r"Corporation|Corp\.?|Inc\.?|Associates)\s*$",
+    re.IGNORECASE,
+)
+
+
+class CompanyNameRegistry:
+    """
+    Tracks canonical (full, legal-suffix-validated) company names seen
+    across a document, and finds later/earlier informal repeat mentions
+    of those same names so they can be redacted consistently.
+
+    Usage pattern (see integration note at bottom of file):
+        registry = CompanyNameRegistry()
+
+        # Pass 1 — warm up the registry using the FULL document text,
+        # so shortened mentions that appear BEFORE their full-suffix
+        # counterpart are still caught.
+        registry.warm_up(full_document_text, nlp)
+
+        # Pass 2 — normal per-paragraph redaction loop, passing the
+        # warmed registry into detect_all_pii each time.
+        for paragraph_text in paragraphs:
+            results = detect_all_pii(paragraph_text, nlp, company_registry=registry)
+    """
+
+    def __init__(self):
+        # short_form (lowercase) -> canonical full name (as first seen)
+        self._canonical = {}
+
+    def register(self, full_company_name):
+        """Record a validated full-suffix company name."""
+        short = _LEGAL_SUFFIX_TRIM_PATTERN.sub("", full_company_name).strip()
+
+        if not short or short.lower() == full_company_name.strip().lower():
+            return
+
+        key = short.lower()
+
+        if key not in self._canonical:
+            self._canonical[key] = full_company_name.strip()
+
+    def warm_up(self, full_text, nlp):
+        """
+        Run NER once over the ENTIRE document text purely to populate
+        the registry with every full-suffix company name, regardless
+        of where in the document it first appears. This guarantees
+        shortened mentions are caught even if they occur earlier in
+        the document than their full-suffix counterpart.
+        """
+        doc = nlp(full_text)
+
+        for entity in doc.ents:
+            if entity.label_ != "ORG":
+                continue
+
+            entity_text = entity.text.strip()
+
+            if is_valid_company(entity_text):
+                self.register(entity_text)
+
+    def find_shortened_mentions(self, text):
+        """
+        Scan `text` for standalone occurrences of any registered
+        shortened company name and return them as COMPANY detections.
+        Each result carries a `canonical` field so the caller's fake-
+        value mapper can map both the full and short form to the SAME
+        fake company name.
+        """
+        results = []
+
+        for short_lower, canonical in self._canonical.items():
+            pattern = re.compile(
+                r"\b" + re.escape(short_lower) + r"\b",
+                re.IGNORECASE,
+            )
+
+            for match in pattern.finditer(text):
+                results.append({
+                    "type": "COMPANY",
+                    "value": match.group(),
+                    "start": match.start(),
+                    "end": match.end(),
+                    "canonical": canonical,
+                })
+
+        return results
+
+
+# ============================================================
 # NER DETECTOR
 # ============================================================
 
-def detect_ner_entities(text, nlp):
+def detect_ner_entities(text, nlp, company_registry=None):
 
     doc = nlp(text)
 
@@ -956,6 +1127,23 @@ def detect_ner_entities(text, nlp):
                     "end": entity.end_char,
                 })
 
+            else:
+                # BUG FIX: try recovering a valid name by trimming a
+                # greedily-attached trailing title/role word.
+                trimmed = _try_trim_person(
+                    entity_text,
+                    entity.start_char,
+                )
+
+                if trimmed:
+                    value, start, end = trimmed
+                    results.append({
+                        "type": "PERSON",
+                        "value": value,
+                        "start": start,
+                        "end": end,
+                    })
+
         # ----------------------------------------------------
         # ORGANIZATION -> COMPANY
         # ----------------------------------------------------
@@ -970,6 +1158,38 @@ def detect_ner_entities(text, nlp):
                     "start": entity.start_char,
                     "end": entity.end_char,
                 })
+
+                if company_registry is not None:
+                    company_registry.register(entity_text)
+
+            else:
+                # BUG FIX: names followed by trailing footnote/junk
+                # characters (e.g. "Kushal Subbayya Hegde*^&") are
+                # sometimes mislabeled ORG instead of PERSON. Strip
+                # the junk and see if what's left is a valid name.
+                stripped = _strip_trailing_junk(entity_text)
+
+                if stripped != entity_text and is_valid_person(stripped):
+                    end_char = entity.start_char + len(stripped)
+                    results.append({
+                        "type": "PERSON",
+                        "value": stripped,
+                        "start": entity.start_char,
+                        "end": end_char,
+                    })
+
+    # --------------------------------------------------------
+    # BUG FIX: company-consistency pass — catch shortened repeat
+    # mentions of companies already confirmed elsewhere via their
+    # full, legal-suffix name (requires a warmed-up registry).
+    # --------------------------------------------------------
+
+    if company_registry is not None:
+        shortened_hits = company_registry.find_shortened_mentions(text)
+
+        for hit in shortened_hits:
+            if not _overlaps(hit, results):
+                results.append(hit)
 
     # --------------------------------------------------------
     # Keep document order
@@ -1003,7 +1223,14 @@ def _overlaps(result, existing_results):
 # MASTER DETECTOR
 # ============================================================
 
-def detect_all_pii(text, nlp=None):
+def detect_all_pii(text, nlp=None, company_registry=None):
+    """
+    company_registry is OPTIONAL and fully backward compatible:
+    existing calls like detect_all_pii(text, nlp) behave exactly as
+    before. Pass a warmed-up CompanyNameRegistry to additionally catch
+    shortened/informal repeat mentions of companies already confirmed
+    elsewhere in the document (see CompanyNameRegistry docstring).
+    """
 
     results = []
 
@@ -1040,7 +1267,8 @@ def detect_all_pii(text, nlp=None):
 
         ner_results = detect_ner_entities(
             text,
-            nlp
+            nlp,
+            company_registry=company_registry,
         )
 
         for detection in ner_results:
